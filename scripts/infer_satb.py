@@ -7,9 +7,23 @@ import soundfile as sf
 from huggingface_hub import hf_hub_download
 
 # Needed to import from src.model inside ext/SepACap
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ext", "SepACap"))
+_SEPACAP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ext", "SepACap")
+sys.path.insert(0, _SEPACAP_DIR)
+
+# Temporarily remove the project root and '.' from sys.path to prevent namespace
+# collision between A-Cappella-Transcription/src and ext/SepACap/src
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+original_sys_path = sys.path.copy()
+sys.path = [
+    p for p in sys.path
+    if os.path.abspath(p) != project_root and p not in ("", ".")
+]
+
 from src.model import Model
 from src.utils import util_system
+
+# Restore path
+sys.path = original_sys_path
 
 
 def main():
