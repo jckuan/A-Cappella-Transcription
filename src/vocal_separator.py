@@ -25,8 +25,9 @@ class VocalSeparator:
         # NOTE: Demucs CLI can be invoked if installed via pip or run via python -m demucs
         # For this prototype we assume demucs is accessible in the environment. 
         # Command structure typical of demucs (mp3/wav output, 2-stems: vocals/drums)
+        # Use python -m demucs.separate to avoid global PATH binary resolution issues
         cmd = [
-            "demucs",
+            sys.executable, "-m", "demucs.separate",
             "--two-stems", "vocals", # separate vocals (VP-less) and drums (VP)
             "-o", output_dir,
             "-n", "htdemucs", # high-res demucs
