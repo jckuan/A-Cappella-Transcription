@@ -77,37 +77,60 @@ def main():
         audio = audio.mean(dim=0, keepdim=True)
     audio = audio.squeeze(0)
 
-    print(f"Running inference on {args.input} (chunked on {device.type})...")
+    print(f"Running inference on {args.input} (chunked on {device.type} with overlap-add)...")
     with torch.no_grad():
-        # CUDA can handle larger chunks without OOM; CPU needs smaller ones
-        if device.type == "cuda":
-            chunk_size = 20 * 24000  # 20 seconds — fits safely in 24 GB VRAM
-        else:
-            chunk_size = 15 * 24000  # 15 seconds for CPU
-
-        chunks = torch.split(audio, chunk_size, dim=-1)
-        separated_sources_list: list[list[torch.Tensor]] = [[] for _ in range(7)]
-
-        for i, chunk in enumerate(chunks):
-            print(f"  Processing chunk {i+1}/{len(chunks)}...")
+        # SepACap scales quadratically with sequence length. A 10-second chunk uses ~12GB VRAM.
+        chunk_sec = 10
+        chunk_size = chunk_sec * 24000
+        step_size = chunk_size // 2  # 50% overlap
+        
+        audio_len = audio.shape[-1]
+        out_audio_stems = [torch.zeros(audio_len, device='cpu') for _ in range(7)]
+        window_sum = torch.zeros(audio_len, device='cpu')
+        
+        # Hann window for smooth crossfading
+        window = torch.hann_window(chunk_size, device='cpu')
+        
+        for start_idx in range(0, audio_len, step_size):
+            end_idx = min(start_idx + chunk_size, audio_len)
+            chunk = audio[start_idx:end_idx]
+            
+            actual_chunk_len = chunk.shape[-1]
+            if actual_chunk_len == 0:
+                break
+                
             chunk_input = chunk.to(device).unsqueeze(0)
-
-            # Pad the last chunk if shorter than chunk_size
+            
+            # Pad if this is the final chunk that doesn't fit the window
             pad_len = 0
-            if chunk.shape[-1] < chunk_size:
-                pad_len = chunk_size - chunk.shape[-1]
+            if actual_chunk_len < chunk_size:
+                pad_len = chunk_size - actual_chunk_len
                 chunk_input = torch.nn.functional.pad(chunk_input, (0, pad_len))
-
+                
+            print(f"  Processing chunk {start_idx/24000:.1f}s - {(start_idx+actual_chunk_len)/24000:.1f}s...")
             sep_chunk, _ = model(chunk_input)
-
+            
             for stem_idx in range(7):
                 stem_out = sep_chunk[stem_idx].cpu().squeeze()
                 if pad_len > 0:
                     stem_out = stem_out[:-pad_len]
-                separated_sources_list[stem_idx].append(stem_out)
-
+                
+                # Apply overlap-add windowing
+                chunk_window = window[:actual_chunk_len]
+                out_audio_stems[stem_idx][start_idx:end_idx] += stem_out * chunk_window
+                
+            window_sum[start_idx:end_idx] += window[:actual_chunk_len]
+            
+            # Clean VRAM to prevent fragmentation OOM
+            del sep_chunk
+            del chunk_input
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+                
+        # Normalize by the window sum to complete the crossfade
+        # Add small epsilon to prevent division by zero at the very edges
         separated_sources = [
-            torch.cat(stem_chunks, dim=-1) for stem_chunks in separated_sources_list
+            (stem_buf / (window_sum + 1e-8)) for stem_buf in out_audio_stems
         ]
 
     # stem order from model: alto(0), bass(1), finger_snap(2), lead_vocal(3), soprano(4), tenor(5), vocal_percussion(6)
