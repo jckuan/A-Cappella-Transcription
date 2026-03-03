@@ -1,0 +1,25 @@
+{
+    "Attention_normalized": {
+        "bpm": 102,
+        "time_signature": "4/4",
+        "num_singers": 4,
+        "pitch_bounds_midi": {
+            "bass": [
+                37,
+                59
+            ],
+            "tenor": [
+                52,
+                67
+            ],
+            "alto": [
+                55,
+                72
+            ],
+            "soprano": [
+                59,
+                76
+            ]
+        }
+    }
+}
