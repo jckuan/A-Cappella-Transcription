@@ -1,6 +1,6 @@
 import os
+import sys
 import subprocess
-import torch
 import numpy as np
 import soundfile as sf
 from typing import Dict, Optional
@@ -67,9 +67,13 @@ class VocalSeparator:
         track_out_dir = os.path.join(output_dir, "SepACap", track_name)
         os.makedirs(track_out_dir, exist_ok=True)
         
-        # Use our new inference wrapper
+        # Use inference wrapper from scripts/ (tracked by git, not inside ext/)
+        infer_script = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scripts", "infer_satb.py"
+        )
         cmd = [
-            "python", os.path.join(self.sepacap_path, "infer_satb.py"),
+            sys.executable, infer_script,
             "--input", vp_less_audio,
             "--output_dir", track_out_dir
         ]
