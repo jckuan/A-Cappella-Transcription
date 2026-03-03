@@ -58,20 +58,20 @@ class VocalSeparator:
 
     def separate_satb(self, vp_less_audio: str, output_dir: str, track_name: str = None) -> Optional[Dict[str, str]]:
         """
-        Step 2: Uses SepACap to split the VP-less mix into SATB parts.
+        Step 2: Uses RoFormer to split the VP-less mix into pseudo-SATB parts.
         """
-        print(f"[SEPARATOR] Phase 2 - Splitting SATB from {vp_less_audio}")
+        print(f"[SEPARATOR] Phase 2 - Splitting pseudo-SATB from {vp_less_audio}")
         
         if track_name is None:
             track_name = os.path.splitext(os.path.basename(vp_less_audio))[0]
             
-        track_out_dir = os.path.join(output_dir, "SepACap", track_name)
+        track_out_dir = os.path.join(output_dir, "RoFormer", track_name)
         os.makedirs(track_out_dir, exist_ok=True)
         
         # Use inference wrapper from scripts/ (tracked by git, not inside ext/)
         infer_script = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "scripts", "infer_satb.py"
+            "scripts", "infer_roformer.py"
         )
         cmd = [
             sys.executable, infer_script,
@@ -82,15 +82,14 @@ class VocalSeparator:
         print(f"[SEPARATOR] Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-             print(f"[SEPARATOR ERROR] SepACap failed: {result.stderr}")
+             print(f"[SEPARATOR ERROR] RoFormer failed: {result.stderr}")
              return None
         
-        vocals_base = os.path.splitext(os.path.basename(vp_less_audio))[0]
         stems = {
-            "soprano": os.path.join(track_out_dir, f"{vocals_base}_soprano.wav"),
-            "alto": os.path.join(track_out_dir, f"{vocals_base}_alto.wav"),
-            "tenor": os.path.join(track_out_dir, f"{vocals_base}_tenor.wav"),
-            "bass": os.path.join(track_out_dir, f"{vocals_base}_bass.wav"),
+            "soprano": os.path.join(track_out_dir, "soprano.wav"),
+            "alto": os.path.join(track_out_dir, "alto.wav"),
+            "tenor": os.path.join(track_out_dir, "tenor.wav"),
+            "bass": os.path.join(track_out_dir, "bass.wav"),
         }
                 
         return stems
