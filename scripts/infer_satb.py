@@ -79,8 +79,9 @@ def main():
 
     print(f"Running inference on {args.input} (chunked on {device.type} with overlap-add)...")
     with torch.no_grad():
-        # SepACap scales quadratically with sequence length. A 10-second chunk uses ~12GB VRAM.
-        chunk_sec = 10
+        # SepACap scales quadratically with sequence length. A 4-second chunk uses less VRAM
+        # and matches the exact max_len (96000 samples) used during training.
+        chunk_sec = 4
         chunk_size = chunk_sec * 24000
         step_size = chunk_size // 2  # 50% overlap
         
@@ -99,19 +100,32 @@ def main():
             if actual_chunk_len == 0:
                 break
                 
-            chunk_input = chunk.to(device).unsqueeze(0)
-            
             # Pad if this is the final chunk that doesn't fit the window
             pad_len = 0
             if actual_chunk_len < chunk_size:
                 pad_len = chunk_size - actual_chunk_len
+            
+            # Convert to float32 as expected by model (and eval script)
+            chunk_input = chunk.to(dtype=torch.float32, device=device)
+            
+            # The model expects [B, T], and internally unsqueezes to [B, 1, T]
+            chunk_input = chunk_input.unsqueeze(0)  # Shape: [1, T]
+            
+            # Pad if this is the final chunk that doesn't fit the window
+            if pad_len > 0:
                 chunk_input = torch.nn.functional.pad(chunk_input, (0, pad_len))
                 
             print(f"  Processing chunk {start_idx/24000:.1f}s - {(start_idx+actual_chunk_len)/24000:.1f}s...")
+            
+            # Process through model
             sep_chunk, _ = model(chunk_input)
             
+            # Detach and move to CPU immediately to save VRAM
+            # sep_chunk is a list of tensors, each [1, 1, T]
+            sep_chunk_cpu = [stem.squeeze().detach().cpu() for stem in sep_chunk]
+            
             for stem_idx in range(7):
-                stem_out = sep_chunk[stem_idx].cpu().squeeze()
+                stem_out = sep_chunk_cpu[stem_idx]
                 if pad_len > 0:
                     stem_out = stem_out[:-pad_len]
                 
