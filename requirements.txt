@@ -1,7 +1,21 @@
-ffmpeg-python>=0.2.0
-numpy>=1.20.0
+# Core transcription
+basic-pitch==0.3.0
+pretty_midi==0.2.11
+
+# Audio processing
+librosa==0.11.0
+soundfile==0.13.1
+scipy>=1.11.0
+numpy>=1.26.0
+
+# Harmonic analysis (optional, for --harmonic_filter)
+music21==9.9.1
+autochord==0.1.4   # Note: requires Linux-native VAMP binary (not functional on macOS/Windows)
+vamp==1.1.0
+
+# Stem separation (used externally via CLI; see Getting Started)
+demucs==4.0.1
+
+# Testing
 pytest>=7.0.0
-librosa>=0.10.0
-soundfile>=0.12.1
 mir_eval>=0.7
-demucs

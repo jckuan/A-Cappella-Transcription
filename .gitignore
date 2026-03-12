@@ -5,6 +5,7 @@ env/
 
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *$py.class
 *.so
@@ -27,6 +28,7 @@ data/output/
 ext/
 *.wav
 *.mp3
+*.mid
 
 # Model Weights
 *.pth
